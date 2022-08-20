@@ -4,19 +4,19 @@ import { serveFile } from "https://deno.land/std@0.152.0/http/file_server.ts";
 import { join, relative } from "https://deno.land/std@0.152.0/path/mod.ts";
 import { join as joinUrl } from "https://deno.land/std@0.152.0/path/posix.ts";
 import { ensureDir } from "https://deno.land/std@0.152.0/fs/mod.ts";
-import { GithubFetcher, GithubFetcherOptions } from "./fetchers/github.ts";
+import { GitHubFetcher, GitHubFetcherOptions } from "./fetchers/github.ts";
 
 interface Options {
-  source: GithubFetcherOptions;
+  source: GitHubFetcherOptions;
   port?: number;
 }
 
 class Busad {
-  private readonly fetcher: GithubFetcher;
+  private readonly fetcher: GitHubFetcher;
   private readonly cachePath = "__cache";
   private readonly assetPath = "__assets";
   constructor(private readonly options: Options) {
-    this.fetcher = new GithubFetcher(options.source);
+    this.fetcher = new GitHubFetcher(options.source);
   }
 
   async buildTsx(file: string) {
@@ -72,7 +72,10 @@ class Busad {
         return await serveFile(req, join(this.cachePath, "index.html"));
       }
       if (path.startsWith("/@__assets")) {
-        return await serveFile(req, join(this.assetPath, relative('/@__assets', path)));
+        return await serveFile(
+          req,
+          join(this.assetPath, relative("/@__assets", path))
+        );
       }
       if (path.endsWith(".ts") || path.endsWith(".tsx")) {
         await this.buildTsx(path);

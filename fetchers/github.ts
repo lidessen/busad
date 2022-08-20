@@ -1,14 +1,14 @@
 import { WebFetcher } from "./web.ts";
 
-export interface GithubFetcherOptions {
+export interface GitHubFetcherOptions {
   repo: string;
   entry: string;
   branch?: string;
 }
 
-export class GithubFetcher {
+export class GitHubFetcher {
   private readonly webFetcher: WebFetcher;
-  constructor(private readonly options: GithubFetcherOptions) {
+  constructor(private readonly options: GitHubFetcherOptions) {
     this.webFetcher = new WebFetcher({
       base: this.base,
       localPath: "./__source",
