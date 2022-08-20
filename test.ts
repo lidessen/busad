@@ -1,5 +1,8 @@
 import { busad } from "./mod.ts";
 
 busad({
-  entry: "https://raw.githubusercontent.com/aoiste/deno_test_app/main/main.tsx",
-});
+  source: {
+    repo: "aoiste/deno_test_app",
+    entry: "main.tsx",
+  },
+}).serve();
