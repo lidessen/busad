@@ -5,6 +5,9 @@ import { join, relative } from "https://deno.land/std@0.152.0/path/mod.ts";
 import { join as joinUrl } from "https://deno.land/std@0.152.0/path/posix.ts";
 import { ensureDir } from "https://deno.land/std@0.152.0/fs/mod.ts";
 import { GitHubFetcher, GitHubFetcherOptions } from "./fetchers/github.ts";
+import { rewriteDenoImports, rewriteGitHubImports } from "./import.ts";
+import { processAsset, processCss } from "./process.ts";
+import { DenoDependency } from "./dep/deno.ts";
 
 interface Options {
   source: GitHubFetcherOptions;
@@ -13,19 +16,23 @@ interface Options {
 
 class Busad {
   private readonly fetcher: GitHubFetcher;
+  private readonly denoDeps: DenoDependency;
   private readonly cachePath = "__cache";
   private readonly assetPath = "__assets";
   constructor(private readonly options: Options) {
     this.fetcher = new GitHubFetcher(options.source);
+    this.denoDeps = new DenoDependency();
   }
 
   async buildTsx(file: string) {
     const localPath = await this.fetcher.sync(file);
     try {
       const content = await getTextContent(localPath);
-      const { code } = await esbuild.transform(content, {
+      let { code } = await esbuild.transform(content, {
         loader: "tsx",
       });
+      code = rewriteGitHubImports(code);
+      code = rewriteDenoImports(code);
       await Deno.writeTextFile(join(this.cachePath, file), code);
     } catch (error) {
       console.log(error);
@@ -36,11 +43,7 @@ class Busad {
     const localPath = await this.fetcher.sync(file);
     try {
       const content = await getTextContent(localPath);
-      const code = removeIntent(`
-      const style = document.createElement('style')
-      style.textContent = atob("${btoa(content)}")
-      document.head.appendChild(style)
-      `);
+      const code = processCss(content);
       await Deno.writeTextFile(join(this.cachePath, file), code);
     } catch (error) {
       console.log(error);
@@ -50,12 +53,9 @@ class Busad {
   async buildAsset(file: string) {
     const localPath = await this.fetcher.sync(file);
     try {
-      ensureDir(this.assetPath);
+      await ensureDir(this.assetPath);
       await Deno.copyFile(localPath, join(this.assetPath, file));
-      const code = removeIntent(`
-      const path = "${joinUrl("/@__assets", file)}"
-      export default path
-      `);
+      const code = processAsset(joinUrl("/@__assets", file));
       await Deno.writeTextFile(join(this.cachePath, file), code);
     } catch (error) {
       console.log(error);
@@ -75,6 +75,19 @@ class Busad {
         return await serveFile(
           req,
           join(this.assetPath, relative("/@__assets", path))
+        );
+      }
+      if (path.startsWith("/@deno")) {
+        await this.denoDeps.sync(path);
+        const headers = new Headers();
+        headers.append("content-type", "application/javascript");
+        return new Response(
+          await Deno.readTextFile(
+            join(this.denoDeps.root, relative("/@deno", path))
+          ),
+          {
+            headers,
+          }
         );
       }
       if (path.endsWith(".ts") || path.endsWith(".tsx")) {
