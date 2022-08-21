@@ -4,6 +4,7 @@ export interface GitHubFetcherOptions {
   repo: string;
   entry: string;
   branch?: string;
+  branchQuery?: string;
 }
 
 export class GitHubFetcher {
@@ -24,8 +25,6 @@ export class GitHubFetcher {
   }
 
   get base() {
-    return `https://raw.githubusercontent.com/${this.options.repo}/${
-      this.options.branch ?? "main"
-    }`;
+    return `https://raw.githubusercontent.com/${this.options.repo}`;
   }
 }

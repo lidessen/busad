@@ -1,6 +1,5 @@
-import { join } from "https://deno.land/std@0.152.0/path/mod.ts";
+import { join, dirname } from "https://deno.land/std@0.152.0/path/mod.ts";
 import { join as joinUrl } from "https://deno.land/std@0.152.0/path/posix.ts";
-import { Buffer } from "https://deno.land/std@0.152.0/io/buffer.ts";
 import { ensureDir } from "https://deno.land/std@0.152.0/fs/ensure_dir.ts";
 
 interface WebFetcherOptions {
@@ -12,7 +11,7 @@ export class WebFetcher {
   constructor(private readonly options: WebFetcherOptions) {}
 
   async sync(path: string) {
-    await ensureDir(this.options.localPath);
+    await ensureDir(dirname(this.localPath(path)));
     if (!(await this.exists(path))) {
       await this.download(path);
     }
@@ -41,8 +40,7 @@ export class WebFetcher {
 
   private async download(path: string) {
     const content = await fetch(this.webUrl(path));
-    const blob = await content.blob();
-    const unit8arr = new Buffer(await blob.arrayBuffer()).bytes();
-    await Deno.writeFile(this.localPath(path), unit8arr);
+    const buffers = await content.arrayBuffer();
+    await Deno.writeFile(this.localPath(path), new Uint8Array(buffers));
   }
 }

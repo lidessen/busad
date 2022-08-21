@@ -1,7 +1,11 @@
 import * as esbuild from "https://deno.land/x/esbuild@v0.15.5/mod.js";
 import { serve } from "https://deno.land/std@0.152.0/http/server.ts";
 import { serveFile } from "https://deno.land/std@0.152.0/http/file_server.ts";
-import { join, relative } from "https://deno.land/std@0.152.0/path/mod.ts";
+import {
+  join,
+  relative,
+  dirname,
+} from "https://deno.land/std@0.152.0/path/mod.ts";
 import { join as joinUrl } from "https://deno.land/std@0.152.0/path/posix.ts";
 import { ensureDir } from "https://deno.land/std@0.152.0/fs/mod.ts";
 import { GitHubFetcher, GitHubFetcherOptions } from "./fetchers/github.ts";
@@ -53,10 +57,13 @@ class Busad {
   async buildAsset(file: string) {
     const localPath = await this.fetcher.sync(file);
     try {
-      await ensureDir(this.assetPath);
-      await Deno.copyFile(localPath, join(this.assetPath, file));
+      const assetPath = join(this.assetPath, file);
+      const cachePath = join(this.cachePath, file);
+      await ensureDir(dirname(assetPath));
+      await ensureDir(dirname(cachePath));
+      await Deno.copyFile(localPath, assetPath);
       const code = processAsset(joinUrl("/@__assets", file));
-      await Deno.writeTextFile(join(this.cachePath, file), code);
+      await Deno.writeTextFile(cachePath, code);
     } catch (error) {
       console.log(error);
     }
@@ -64,12 +71,14 @@ class Busad {
 
   async handler(req: Request) {
     const url = new URL(req.url);
-    await ensureDir(this.cachePath);
+    const branch =
+      url.searchParams.get("branch") ?? this.options.source.branch ?? "main";
+    await ensureDir(join(this.cachePath, branch));
     const path = url.pathname;
     try {
       if (path === "/") {
-        await this.generateIndex();
-        return await serveFile(req, join(this.cachePath, "index.html"));
+        await this.generateIndex(branch);
+        return await serveFile(req, join(this.cachePath, branch, "index.html"));
       }
       if (path.startsWith("/@__assets")) {
         return await serveFile(
@@ -142,8 +151,8 @@ class Busad {
     }
   }
 
-  async generateIndex() {
-    const indexPath = join(this.cachePath, "index.html");
+  async generateIndex(branch: string) {
+    const indexPath = join(this.cachePath, branch, "index.html");
     if (await exists(indexPath)) {
       return;
     }
@@ -158,7 +167,7 @@ class Busad {
           <title>Document</title>
       </head>
       <body>
-          <script type="module" src="./${this.options.source.entry}"></script>
+          <script type="module" src="./${branch}/${this.options.source.entry}"></script>
       </body>
       </html>`);
 
